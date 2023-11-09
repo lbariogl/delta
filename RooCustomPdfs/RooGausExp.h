@@ -7,13 +7,12 @@
 #ifndef RooGausExp_hpp
 #define RooGausExp_hpp
 
-#include "RooAbsPdf.h"
-#include "RooRealProxy.h"
-#include "RooCategoryProxy.h"
-#include "RooAbsReal.h"
-#include "RooAbsCategory.h"
+#include <RooAbsPdf.h>
+#include <RooRealProxy.h>
+#include <RooCategoryProxy.h>
+#include <RooAbsReal.h>
 
-//#define _AN_INT_
+#define _AN_INT_
 
 class RooGausExp : public RooAbsPdf {
 public:
