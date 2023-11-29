@@ -99,7 +99,7 @@ def createHistograms(label, res_dir):
         # signal
         mu = ROOT.RooRealVar('mu', '#mu', 1.2, 1.4, 'GeV/c^{2}')
         # gamma = ROOT.RooRealVar('gamma', '#Gamma', 0.05, 0.4, 'GeV/c^{2}')
-        sigma = ROOT.RooRealVar('sigma', '#Sigma', 0.001, 0.4, 'GeV/c^{2}')
+        sigma = ROOT.RooRealVar('sigma', '#Sigma', 0.01, 0.07, 'GeV/c^{2}')
         tau = ROOT.RooRealVar('tau', '#tau', 0.01, 0.8, 'GeV/c^{2}')
 
 
@@ -108,7 +108,7 @@ def createHistograms(label, res_dir):
 
         signal = ROOT.RooGausExp('gauss_exp', 'gauss_exp signal', mass, mu, sigma, tau)
         # background
-        c0 = ROOT.RooRealVar('c0', 'constant c0', -1., 1.)
+        c0 = ROOT.RooRealVar('c0', 'constant c0', -1.5, 1.)
 
         background = ROOT.RooChebychev('bkg', 'pol1 bkg', mass, ROOT.RooArgList(c0))
 
