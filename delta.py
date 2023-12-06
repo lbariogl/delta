@@ -42,13 +42,13 @@ def createHistograms(label, res_dir):
     if mc:
         hMass_Gen = []
 
-    for i_pt in range(1, histo_2D_SE.GetXaxis().GetNbins()):
+    for i_pt in range(1, histo_2D_SE.GetXaxis().GetNbins() + 1):
         print(f'pt bin {i_pt} / {histo_2D_SE.GetXaxis().GetNbins()}')
         pt_title = str(histo_2D_SE.GetXaxis().GetBinLowEdge(i_pt)) + r' #leq #it{p}_{T} < ' + str(
             histo_2D_SE.GetXaxis().GetBinLowEdge(i_pt + 1)) + r' (GeV/#it{c})'
         # same-event
         histo_SE = histo_2D_SE.ProjectionY(
-            f'hAntiDeltaPlusPlus_SE_{i_pt}', i_pt, i_pt)
+            f'h{label}_SE_{i_pt}', i_pt, i_pt)
         histo_SE.SetTitle(pt_title)
         histo_SE.SetMarkerStyle(20)
         histo_SE.SetMarkerColor(ROOT.kRed+1)
