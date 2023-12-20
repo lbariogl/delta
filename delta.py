@@ -1,6 +1,7 @@
 import ROOT
 import argparse
 import yaml
+import math
 
 kBlueC = ROOT.TColor.GetColor('#1f78b4')
 kOrangeC = ROOT.TColor.GetColor('#ff7f00')
@@ -53,8 +54,14 @@ def createHistograms(label, res_dir):
         hMass_Gen = []
 
     
-    Chi2Pt = ROOT.TGraph()
-    NSignalPt = ROOT.TGraph()
+    hChi2Pt = histo_2D_SE.ProjectionX("hChi2pT")
+    hChi2Pt.GetYaxis().SetTitle(r'#chi^{2} / NDF')
+    hChi2Pt.GetYaxis().SetTitleOffset(1.2)
+    hChi2Pt.SetTitle('')
+    hRawSpectrum = hChi2Pt.Clone('hRawSpectrum')
+    hRawSpectrum.GetYaxis().SetTitle(r'#frac{d#it{N}}{d#it{p}_{T}} (GeV/#it{c})^{-1}')
+    hRawSpectrum.GetYaxis().SetTitleOffset(1.2)
+    hRawSpectrum.SetTitle('')
 
     for i_pt in range(1, histo_2D_SE.GetXaxis().GetNbins() + 1):
         print(f'pt bin {i_pt} / {histo_2D_SE.GetXaxis().GetNbins()}')
@@ -186,21 +193,25 @@ def createHistograms(label, res_dir):
             res_dir.cd('generated')
             histo_gen.Write()
         
-        Chi2Pt.AddPoint(histo_2D_SE.GetXaxis().GetBinCenter(i_pt), chi2)
-        NSignalPt.AddPoint(histo_2D_SE.GetXaxis().GetBinCenter(i_pt), n_signal.getVal())
+        if not math.isnan(chi2):
+            hChi2Pt.SetBinContent(i_pt, chi2)
+            hChi2Pt.SetBinError(i_pt, 0)
+        print(f'i_pt: {i_pt} chi2 : {chi2}')
+        hRawSpectrum.SetBinContent(i_pt, n_signal.getVal())
+        hRawSpectrum.SetBinError(i_pt, n_signal.getError())
         
-    res_dir.cd('histo in pt')
-    Chi2Pt.SetMarkerStyle(20)
-    Chi2Pt.SetTitle("Chi2 #it{p}_{T} (GeV/#it{c}); #it{p}_{T} (GeV/#it{c}); Chi2")
-    c1 = ROOT.TCanvas("Chi2Pt", "Chi2Pt", 800, 600)
-    Chi2Pt.Draw("AP")
-    c1.SetLogy()
-    c1.Write("Chi2Pt")
-    NSignalPt.SetTitle("NSignal #it{p}_{T} (GeV/#it{c}); #it{p}_{T} (GeV/#it{c}); NSignal")
-    NSignalPt.SetMarkerStyle(20)
-    n1 = ROOT.TCanvas("NSignalPt", "NSignalPt", 800, 600)
-    NSignalPt.Draw("AP")
-    n1.Write("NSignalPt")
+    res_dir.cd('Pt')
+    hChi2Pt.SetMarkerStyle(20)
+    cChi2Pt = ROOT.TCanvas("cChi2Pt", "cChi2Pt", 800, 600)
+    cChi2Pt.SetLeftMargin(0.15)
+    hChi2Pt.Draw()
+    cChi2Pt.SetLogy()
+    cChi2Pt.Write()
+    hRawSpectrum.SetMarkerStyle(20)
+    cRawSpectrum = ROOT.TCanvas("cRawSpectrum", "cRawSpectrum", 800, 600)
+    cRawSpectrum.SetLeftMargin(0.15)
+    hRawSpectrum.Draw("PE")
+    cRawSpectrum.Write()
 
 
     
@@ -227,7 +238,7 @@ deltaplusplus_dir.mkdir('diff')
 if mc:
     deltaplusplus_dir.mkdir('generated')
 
-deltaplusplus_dir.mkdir('histo in pt')
+deltaplusplus_dir.mkdir('Pt')
 
 print('Delta++')
 createHistograms(label='DeltaPlusPlus', res_dir=deltaplusplus_dir)
@@ -241,7 +252,7 @@ antideltaplusplus_dir.mkdir('diff')
 if mc:
     antideltaplusplus_dir.mkdir('generated')
 
-antideltaplusplus_dir.mkdir('histo in pt')
+antideltaplusplus_dir.mkdir('Pt')
 
 print('AntiDelta++')
 createHistograms(label='AntiDeltaPlusPlus', res_dir=antideltaplusplus_dir)
@@ -255,7 +266,7 @@ deltazero_dir.mkdir('diff')
 if mc:
     deltazero_dir.mkdir('generated')
 
-deltazero_dir.mkdir('histo in pt')
+deltazero_dir.mkdir('Pt')
 
 print('Delta0')
 createHistograms(label='DeltaZero', res_dir=deltazero_dir)
@@ -269,7 +280,7 @@ antideltazero_dir.mkdir('diff')
 if mc:
     antideltazero_dir.mkdir('generated')
 
-antideltazero_dir.mkdir('histo in pt')
+antideltazero_dir.mkdir('Pt')
 
 print('AntiDelta0')
 createHistograms(label='AntiDeltaZero', res_dir=antideltazero_dir)
