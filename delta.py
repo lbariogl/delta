@@ -1,5 +1,6 @@
 import ROOT
 import argparse
+import yaml
 
 kBlueC = ROOT.TColor.GetColor('#1f78b4')
 kOrangeC = ROOT.TColor.GetColor('#ff7f00')
@@ -14,9 +15,18 @@ parser = argparse.ArgumentParser(
     description='Configure the parameters of the script.')
 parser.add_argument('--mc', dest='mc', action='store_true',
                     help="if True MC information is stored.", default=False)
+parser.add_argument('--config-file', dest='config_file',
+                    help="path to the YAML file with configuration.", default='delta_fit_parameters.yaml')
 args = parser.parse_args()
+if args.config_file == "":
+    print('** No config file provided. Exiting. **')
+    exit()
 
 mc = args.mc
+
+delta_params_file = open(args.config_file, 'r')
+delta_params = yaml.full_load(delta_params_file)
+
 
 def lift_histo(histo):
     offset = histo.GetBinContent(histo.GetMinimumBin())
@@ -42,9 +52,13 @@ def createHistograms(label, res_dir):
     if mc:
         hMass_Gen = []
 
+    
+    Chi2Pt = ROOT.TGraph()
+    NSignalPt = ROOT.TGraph()
+
     for i_pt in range(1, histo_2D_SE.GetXaxis().GetNbins() + 1):
         print(f'pt bin {i_pt} / {histo_2D_SE.GetXaxis().GetNbins()}')
-        pt_title = str(histo_2D_SE.GetXaxis().GetBinLowEdge(i_pt)) + r' #leq #it{p}_{T} < ' + str(
+        pt_title = f'{label} ' + str(histo_2D_SE.GetXaxis().GetBinLowEdge(i_pt)) + r' #leq #it{p}_{T} < ' + str(
             histo_2D_SE.GetXaxis().GetBinLowEdge(i_pt + 1)) + r' (GeV/#it{c})'
         # same-event
         histo_SE = histo_2D_SE.ProjectionY(
@@ -70,10 +84,10 @@ def createHistograms(label, res_dir):
         canvas = ROOT.TCanvas(
             f'cComp{label}_{i_pt}', f'cComp{label}_{i_pt}', 800, 600)
         epsilon = 0.001
-        firt_scale_bin = histo_SE.FindBin(1.5+epsilon)
+        first_scale_bin = histo_SE.FindBin(1.5+epsilon)
         last_scale_bin = histo_SE.FindBin(1.8-epsilon)
         scale_factor = histo_SE.Integral(
-            firt_scale_bin, last_scale_bin) / histo_ME.Integral(firt_scale_bin, last_scale_bin)
+            first_scale_bin, last_scale_bin) / histo_ME.Integral(first_scale_bin, last_scale_bin)
         histo_ME.Scale(scale_factor)
         histo_SE.Draw('PE')
         histo_ME.Draw('PE SAME')
@@ -94,13 +108,13 @@ def createHistograms(label, res_dir):
         hMass_diff.append(histo_diff)
 
         # create roofit routine
-        mass = ROOT.RooRealVar('m', 'm', 1.1, 1.8, 'GeV/c^{2}')
+        mass = ROOT.RooRealVar('m', 'm', 1.05, 1.8, 'GeV/c^{2}')
 
         # signal
-        mu = ROOT.RooRealVar('mu', '#mu', 1.2, 1.4, 'GeV/c^{2}')
+        mu = ROOT.RooRealVar('mu', '#mu', delta_params['mu_low'][i_pt-1], delta_params['mu_up'][i_pt-1], 'GeV/c^{2}')
         # gamma = ROOT.RooRealVar('gamma', '#Gamma', 0.05, 0.4, 'GeV/c^{2}')
-        sigma = ROOT.RooRealVar('sigma', '#Sigma', 0.01, 0.07, 'GeV/c^{2}')
-        tau = ROOT.RooRealVar('tau', '#tau', 0.01, 0.8, 'GeV/c^{2}')
+        sigma = ROOT.RooRealVar('sigma', '#Sigma', delta_params['sigma_low'][i_pt-1], delta_params['sigma_up'][i_pt-1], 'GeV/c^{2}')
+        tau = ROOT.RooRealVar('tau', '#tau', delta_params['tau_low'][i_pt-1], delta_params['tau_up'][i_pt-1], 'GeV/c^{2}')
 
 
         # signal = ROOT.RooVoigtianExp(
@@ -108,19 +122,19 @@ def createHistograms(label, res_dir):
 
         signal = ROOT.RooGausExp('gauss_exp', 'gauss_exp signal', mass, mu, sigma, tau)
         # background
-        c0 = ROOT.RooRealVar('c0', 'constant c0', -1.5, 1.)
+        c0 = ROOT.RooRealVar('c0', 'constant c0', delta_params['c0_low'][i_pt-1], delta_params['c0_up'][i_pt-1])
 
         background = ROOT.RooChebychev('bkg', 'pol1 bkg', mass, ROOT.RooArgList(c0))
 
         # total
-        n_signal = ROOT.RooRealVar('n_signal', 'n_signal', 0., 1e6)
-        n_background = ROOT.RooRealVar('n_background', 'n_background', 0., 1e6)
+        n_signal = ROOT.RooRealVar('n_signal', 'n_signal', delta_params['n_signal_low'][i_pt-1], delta_params['n_signal_up'][i_pt-1])
+        n_background = ROOT.RooRealVar('n_background', 'n_background', delta_params['n_background_low'][i_pt-1], delta_params['n_background_up'][i_pt-1])
 
         model = ROOT.RooAddPdf('total_pdf', 'signal + background', ROOT.RooArgList(
             signal, background), ROOT.RooArgList(n_signal, n_background))
 
         rooMass_diff = ROOT.RooDataHist(f'rooMass_{i_pt}', pt_title, ROOT.RooArgList(mass), ROOT.RooFit.Import(histo_diff, False))
-        model.fitTo(rooMass_diff, ROOT.RooFit.Range(1.1, 1.8), ROOT.RooFit.Verbose(False))
+        fit_results = model.fitTo(rooMass_diff, ROOT.RooFit.Save(True), ROOT.RooFit.Range(1.05, 1.8), ROOT.RooFit.Verbose(False))
 
         # retrieve parameteres from fit
         frame = mass.frame()
@@ -133,6 +147,7 @@ def createHistograms(label, res_dir):
             ROOT.kAzure+1), ROOT.RooFit.Name('total_pdf'))
 
         chi2 = frame.chiSquare('total_pdf', 'data')
+        ndf = histo_2D_SE.GetYaxis().GetNbins() - fit_results.floatParsFinal().getSize()
 
         # add pave for stats
         pinfo_vals = ROOT.TPaveText(0.632, 0.5, 0.932, 0.85, 'NDC')
@@ -155,7 +170,7 @@ def createHistograms(label, res_dir):
         pinfo_vals.AddText(
             'N_{background} = ' + f'{n_background.getVal():.0f} #pm {n_background.getError():.0f}')
         pinfo_vals.AddText(
-            '#chi^{2} = ' + f'{chi2:.2f}')
+            '#chi^{2} / NDF = ' + f'{chi2:.3f} (NDF: {ndf})')
         frame.addObject(pinfo_vals)
         res_dir.cd('diff')
         frame.Write()
@@ -170,6 +185,25 @@ def createHistograms(label, res_dir):
             hMass_Gen.append(histo_gen)
             res_dir.cd('generated')
             histo_gen.Write()
+        
+        Chi2Pt.AddPoint(histo_2D_SE.GetXaxis().GetBinCenter(i_pt), chi2)
+        NSignalPt.AddPoint(histo_2D_SE.GetXaxis().GetBinCenter(i_pt), n_signal.getVal())
+        
+    res_dir.cd('histo in pt')
+    Chi2Pt.SetMarkerStyle(20)
+    Chi2Pt.SetTitle("Chi2 #it{p}_{T} (GeV/#it{c}); #it{p}_{T} (GeV/#it{c}); Chi2")
+    c1 = ROOT.TCanvas("Chi2Pt", "Chi2Pt", 800, 600)
+    Chi2Pt.Draw("AP")
+    c1.SetLogy()
+    c1.Write("Chi2Pt")
+    NSignalPt.SetTitle("NSignal #it{p}_{T} (GeV/#it{c}); #it{p}_{T} (GeV/#it{c}); NSignal")
+    NSignalPt.SetMarkerStyle(20)
+    n1 = ROOT.TCanvas("NSignalPt", "NSignalPt", 800, 600)
+    NSignalPt.Draw("AP")
+    n1.Write("NSignalPt")
+
+
+    
 
     if mc:
         return hMass, hMass_EM, hMass_diff, hMass_Gen, cComp
@@ -193,6 +227,8 @@ deltaplusplus_dir.mkdir('diff')
 if mc:
     deltaplusplus_dir.mkdir('generated')
 
+deltaplusplus_dir.mkdir('histo in pt')
+
 print('Delta++')
 createHistograms(label='DeltaPlusPlus', res_dir=deltaplusplus_dir)
 
@@ -204,6 +240,8 @@ antideltaplusplus_dir.mkdir('comp')
 antideltaplusplus_dir.mkdir('diff')
 if mc:
     antideltaplusplus_dir.mkdir('generated')
+
+antideltaplusplus_dir.mkdir('histo in pt')
 
 print('AntiDelta++')
 createHistograms(label='AntiDeltaPlusPlus', res_dir=antideltaplusplus_dir)
@@ -217,6 +255,8 @@ deltazero_dir.mkdir('diff')
 if mc:
     deltazero_dir.mkdir('generated')
 
+deltazero_dir.mkdir('histo in pt')
+
 print('Delta0')
 createHistograms(label='DeltaZero', res_dir=deltazero_dir)
 
@@ -228,6 +268,8 @@ antideltazero_dir.mkdir('comp')
 antideltazero_dir.mkdir('diff')
 if mc:
     antideltazero_dir.mkdir('generated')
+
+antideltazero_dir.mkdir('histo in pt')
 
 print('AntiDelta0')
 createHistograms(label='AntiDeltaZero', res_dir=antideltazero_dir)
