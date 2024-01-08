@@ -42,3 +42,9 @@
 
 # emacs compatibility
 *~
+
+# macOS stuff
+.DS_Store
+
+# analysis documentation
+Previous_notes
