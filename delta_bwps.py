@@ -9,7 +9,7 @@ ROOT.gROOT.SetBatch()
 # silent mode for fits
 ROOT.RooMsgService.instance().setSilentMode(True)
 ROOT.RooMsgService.instance().setGlobalKillBelow(ROOT.RooFit.ERROR)
-ROOT.gROOT.LoadMacro(r'RooCustomPdfs/RooGausExp.cxx++')
+ROOT.gROOT.LoadMacro(r'RooCustomPdfs/RooBWPS.cxx++')
 # ROOT.gROOT.LoadMacro('RooCustomPdfs/RooVoigtianExp.cxx++')
 
 parser = argparse.ArgumentParser(
@@ -69,6 +69,7 @@ def createHistograms(label, res_dir):
         print(f'pt bin {i_pt} / {histo_2D_SE.GetXaxis().GetNbins()}')
         pt_title = f'{label} ' + str(histo_2D_SE.GetXaxis().GetBinLowEdge(i_pt)) + r' #leq #it{p}_{T} < ' + str(
             histo_2D_SE.GetXaxis().GetBinLowEdge(i_pt + 1)) + r' (GeV/#it{c})'
+        pt_centre = histo_2D_SE.GetXaxis().GetBinCenter(i_pt)
         # same-event
         histo_SE = histo_2D_SE.ProjectionY(
             f'h{label}_SE_{i_pt}', i_pt, i_pt)
@@ -120,19 +121,23 @@ def createHistograms(label, res_dir):
         mass = ROOT.RooRealVar('m', 'm', 1.05, 1.8, 'GeV/c^{2}')
 
         # signal
-        mu = ROOT.RooRealVar(
-            'mu', '#mu', delta_params['mu_low'][i_pt-1], delta_params['mu_up'][i_pt-1], 'GeV/c^{2}')
-        # gamma = ROOT.RooRealVar('gamma', '#Gamma', 0.05, 0.4, 'GeV/c^{2}')
-        sigma = ROOT.RooRealVar(
-            'sigma', '#Sigma', delta_params['sigma_low'][i_pt-1], delta_params['sigma_up'][i_pt-1], 'GeV/c^{2}')
-        tau = ROOT.RooRealVar(
-            'tau', '#tau', delta_params['tau_low'][i_pt-1], delta_params['tau_up'][i_pt-1], 'GeV/c^{2}')
+        m0 = ROOT.RooRealVar(
+            'm0', r'm_{0}', 1.2, 1.4, r'GeV/#it{c}^{2}')
+        gamma = ROOT.RooRealVar(
+            'gamma', r'#Gamma', 0.1, 0.13, r'GeV/#it{c}^{2}')
+        pt = ROOT.RooRealVar(
+            'pt', r'#it{p}_{T}', 0.1, 10, r'GeV/#it{c}')
+        pt.setVal(pt_centre)
+        pt.setConstant(True)
+        temp = ROOT.RooRealVar(
+            'temp', 'T', 0.150, 0.160, 'GeV')
+
 
         # signal = ROOT.RooVoigtianExp(
-        #     'voigt_exp', 'voigt_exp', mass, mu, gamma, sigma, tau, True)
+        #     'voigt_exp', 'voigt_exp', mass, m0, gamma, gamma, tau, True)
 
-        signal = ROOT.RooGausExp(
-            'gauss_exp', 'gauss_exp signal', mass, mu, sigma, tau)
+        signal = ROOT.RooBWPS(
+            'bwps', 'bwps signal', mass, m0, gamma, pt, temp)
         # background
         c0 = ROOT.RooRealVar(
             'c0', 'constant c0', delta_params['c0_low'][i_pt-1], delta_params['c0_up'][i_pt-1])
@@ -152,7 +157,7 @@ def createHistograms(label, res_dir):
         rooMass_diff = ROOT.RooDataHist(f'rooMass_{i_pt}', pt_title, ROOT.RooArgList(
             mass), ROOT.RooFit.Import(histo_diff, False))
         fit_results = model.fitTo(rooMass_diff, ROOT.RooFit.Save(
-            True), ROOT.RooFit.Range(1.05, 1.8), ROOT.RooFit.Verbose(False))
+            True), ROOT.RooFit.Verbose(False))
 
         # retrieve parameteres from fit
         frame = mass.frame()
@@ -175,13 +180,13 @@ def createHistograms(label, res_dir):
         pinfo_vals.SetTextAlign(11)
         pinfo_vals.SetTextFont(42)
         pinfo_vals.AddText(
-            '#mu = ' + f'{mu.getVal():.3f} #pm {mu.getError():.3f}' + ' GeV/#it{c}^{2}')
+            'm_{0} = ' + f'{m0.getVal():.3f} #pm {m0.getError():.3f}' + r' GeV/#it{c}^{2}')
         # pinfo_vals.AddText(
         #     '#Gamma = ' + f'{gamma.getVal():.3f} #pm {gamma.getError():.3f}' + ' GeV/#it{c}^{2}')
         pinfo_vals.AddText(
-            '#sigma = ' + f'{sigma.getVal():.3f} #pm {sigma.getError():.3f}' + ' GeV/#it{c}^{2}')
+            '#Gamma = ' + f'{gamma.getVal():.3f} #pm {gamma.getError():.3f}' + r' GeV/#it{c}^{2}')
         pinfo_vals.AddText(
-            '#tau = ' + f'{tau.getVal():.3f} #pm {tau.getError():.3f}' + ' GeV/#it{c}^{2}')
+            'temp = ' + f'{temp.getVal():.3f} #pm {temp.getError():.3f}' + ' GeV')
         pinfo_vals.AddText(
             'N_{signal} = ' + f'{n_signal.getVal():.0f} #pm {n_signal.getError():.0f}')
         pinfo_vals.AddText(
@@ -236,7 +241,7 @@ input_file = ROOT.TFile.Open('mc/AnalysisResults_train.root')
 input_dir = input_file.Get('deltaAnalysis')
 
 # output
-output_file = ROOT.TFile('delta.root', 'recreate')
+output_file = ROOT.TFile('delta_bwps.root', 'recreate')
 
 # Delta++
 deltaplusplus_dir = output_file.mkdir('delta_plusplus')
